@@ -1,0 +1,49 @@
+name: Gerar executável do Windows
+
+# Roda sozinho a cada envio para o GitHub, ou manualmente na aba "Actions".
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Gerar a pasta windows do projeto
+        run: flutter create --platforms=windows --project-name simulador_frenagem .
+
+      - name: Título e tamanho da janela
+        shell: pwsh
+        run: |
+          $arquivo = 'windows\runner\main.cpp'
+          (Get-Content $arquivo) `
+            -replace 'L"simulador_frenagem"', 'L"Simulador de Frenagem"' `
+            -replace 'Size size\(1280, 720\)', 'Size size(1360, 820)' |
+            Set-Content $arquivo -Encoding UTF8
+
+      - run: flutter pub get
+
+      - name: Análise e testes (não bloqueiam o executável)
+        shell: pwsh
+        run: |
+          flutter analyze
+          flutter test
+        continue-on-error: true
+
+      - run: flutter build windows --release
+
+      - name: Compactar
+        shell: pwsh
+        run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath SimuladorFrenagem_Windows.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SimuladorFrenagem_Windows
+          path: SimuladorFrenagem_Windows.zip
